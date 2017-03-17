@@ -15,6 +15,10 @@ from sqlalchemy.orm import sessionmaker
 logging.basicConfig(format='%(asctime)s %(levelname)s %(funcName)s[%(lineno)d] - %(message)s', level=logging.DEBUG)  # nopep8
 
 
+FILL_STRING = '...'
+MAX_TOPIC_LEN = 20
+MAX_DESCRIPTION_LEN = 70
+
 # date: dd.mm.yyyyy
 REGEX_DATE = r'(\d{2}\.\d{2}\.\d{4})'
 # single date
@@ -64,7 +68,19 @@ def print_todos(todos):
     print todos
     '''
     for todo in todos:
-        print(todo)
+        if len(todo.topic) > MAX_TOPIC_LEN:
+            topic = todo.topic[0:MAX_TOPIC_LEN - len(FILL_STRING)] + FILL_STRING
+        else:
+            topic = todo.topic
+        if len(todo.description) > MAX_DESCRIPTION_LEN:
+            description = todo.description[0:MAX_DESCRIPTION_LEN - len(FILL_STRING)] + FILL_STRING
+        else:
+            description = todo.description
+        print('{0:<{width}s}  {1}  {2}      {3}'.format(topic,
+                                                        todo.due_date.strftime('%d.%m.%Y'),
+                                                        str(todo.done),
+                                                        description,
+                                                        width=MAX_TOPIC_LEN))
 
 
 def add_todo(session):
@@ -73,6 +89,7 @@ def add_todo(session):
 
 def delete_todo(session):
     logging.debug('delete todo')
+
 
 def list_todos(session, list_option='all'):
     ''' This function list todos depending on <list_option>
@@ -100,8 +117,11 @@ def list_todos(session, list_option='all'):
 
     # list all open todos
     elif list_option == 'open':
-        for todo in session.query(ToDo).filter(ToDo.done == False):     # nopep8 E712
-            print(todo)
+        todos = session.query(ToDo).filter(ToDo.done == False)
+        for todo in todos:     # nopep8 E712
+            # print(todo)
+            pass
+        return(todos)
 
     # list all todos with a specific due date
     elif re.search(REGEX_DATE_SINGLE, list_option):
@@ -220,8 +240,9 @@ def main():
     fill_with_test_data(session)
 
     if results.list_option:
-        print(results.list_option)
-        list_todos(session, results.list_option)
+        todos = list_todos(session, results.list_option)
+        if todos:
+            print_todos(todos)
     elif results.add:
         add_todo(session)
     elif results.delete:

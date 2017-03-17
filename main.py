@@ -65,7 +65,7 @@ def fill_with_test_data(session):
 
 def print_todos(todos):
     '''
-    print todos
+    print todos on o the console
     '''
     for todo in todos:
         if len(todo.topic) > MAX_TOPIC_LEN:

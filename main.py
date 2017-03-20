@@ -106,41 +106,19 @@ def list_todos(session, list_option='all'):
     '''
     logging.debug('list todos')
     if list_option == 'all':
-        logging.debug('list all todos')
-        for todo in session.query(ToDo):
-            print(todo)
+        # TODO: sort acording to ToDo.done
+        todos = session.query(ToDo)
+        return(todos)
 
     # list all done todos
     elif list_option == 'done':
-        for todo in session.query(ToDo).filter(ToDo.done):
-            print(todo)
+        todos = session.query(ToDo).filter(ToDo.done)
+        return(todos)
 
     # list all open todos
     elif list_option == 'open':
-        todos = session.query(ToDo).filter(ToDo.done == False)
-        for todo in todos:     # nopep8 E712
-            # print(todo)
-            pass
+        todos = session.query(ToDo).filter(ToDo.done == False)      # nopep8 E712
         return(todos)
-
-    # list all todos with a specific due date
-    elif re.search(REGEX_DATE_SINGLE, list_option):
-        print('\n', '-' * 10, ' ToDos specific due date ', '-' * 10)
-        print(list_option)
-        date1 = re.search(REGEX_DATE_SINGLE, list_option)  # get date
-        dt1 = datetime.datetime.strptime(date1.group(0), '%d.%m.%Y')
-        for todo in session.query(ToDo).filter(ToDo.due_date == dt1):
-            print(todo)
-
-    # list all todos within a specific date range
-    elif re.search(REGEX_DATE_RANGE, list_option):
-        print('\n', '-' * 10, ' ToDos within a date range ', '-' * 10)
-        date1 = re.search(REGEX_DATE_RANGE, list_option).group(1)    # get first date
-        date2 = re.search(REGEX_DATE_RANGE, list_option).group(2)    # get second date
-        dt1 = datetime.datetime.strptime(date1, '%d.%m.%Y')
-        dt2 = datetime.datetime.strptime(date2, '%d.%m.%Y')
-        for todo in session.query(ToDo).filter(and_(ToDo.due_date >= dt1, ToDo.due_date <= dt2)):
-            print(todo)
 
     # list all todos during the interval {x} days or {x}weeks
     elif re.search(REGEX_LIST_OPTION, list_option):
@@ -154,13 +132,33 @@ def list_todos(session, list_option='all'):
         elif regex.group(2) == 'w':
             # TODO: now should be 00:00
             td = (datetime.datetime.now() +
-                  datetime.timedelta(week=int(regex.group(1))))
+                  datetime.timedelta(weeks=int(regex.group(1))))
         # unknown list option
         else:
             raise RuntimeError('unknown list option: ', list_option)
         # list all active todos in the given interval
-        for todo in session.query(ToDo).filter(and_(ToDo.due_date <= td, ToDo.done == False)):   # nopep8 E712
-            print(todo)
+        todos = session.query(ToDo).filter(and_(ToDo.due_date <= td, ToDo.done == False))    # nopep8 E712
+        return(todos)
+
+    # list all todos with a specific due date
+    elif re.search(REGEX_DATE_SINGLE, list_option):
+        print('\n', '-' * 10, ' ToDos specific due date ', '-' * 10)
+        print(list_option)
+        date1 = re.search(REGEX_DATE_SINGLE, list_option)  # get date
+        dt1 = datetime.datetime.strptime(date1.group(0), '%d.%m.%Y')
+        todos = session.query(ToDo).filter(ToDo.due_date == dt1)
+        return(todos)
+
+    # list all todos within a specific date range
+    elif re.search(REGEX_DATE_RANGE, list_option):
+        print('\n', '-' * 10, ' ToDos within a date range ', '-' * 10)
+        date1 = re.search(REGEX_DATE_RANGE, list_option).group(1)    # get first date
+        date2 = re.search(REGEX_DATE_RANGE, list_option).group(2)    # get second date
+        dt1 = datetime.datetime.strptime(date1, '%d.%m.%Y')
+        dt2 = datetime.datetime.strptime(date2, '%d.%m.%Y')
+        todos = session.query(ToDo).filter(and_(ToDo.due_date >= dt1, ToDo.due_date <= dt2))
+        return(todos)
+
     # unknown list option
     else:
         raise RuntimeError('unknown list option: ', list_option)
@@ -205,7 +203,7 @@ def main():
                                      usage='use "python %(prog)s --help" for more information',
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-a', '--add',
-                        action="store_true",
+                        action='store_true',
                         dest='add',
                         default=False,
                         required=False,
@@ -224,13 +222,15 @@ def main():
                         nargs='?',
                         default=None,
                         required=False,
-                        help=textwrap.dedent('''\
+                        help=textwrap.dedent('''
                             list ToDos
                             all   list all ToDos including those which are done
                             open  list all open ToDos
                             done  list all done ToDos
-                            {x}d  list all open ToDos for he next {x} days (where {x} is 0..99 e.g. "2d", "15d", ...)
-                            {x}w  list all open ToDos for he next {x} weeks (where {x} is 0..99 e.g. "2w", "15w", ...)
+                            {x}d  list all open ToDos for the next {x} days (where {x} is 0..99 e.g. "2d", "15d", ...)
+                            {x}w  list all open ToDos for the next {x} weeks (where {x} is 0..99 e.g. "2w", "15w", ...)
+                            {dd.mm.yyyy}  list all open ToDos for the specified date
+                            {dd.mm.yyyy}  list all open ToDos for the specified periode
                         ''')
                         )
     results = parser.parse_args()
@@ -243,10 +243,12 @@ def main():
         todos = list_todos(session, results.list_option)
         if todos:
             print_todos(todos)
+
     elif results.add:
-        add_todo(session)
+        todos = add_todo(session)
+
     elif results.delete:
-        delete_todo(session)
+        todos = delete_todo(session)
 
 
 if __name__ == "__main__":

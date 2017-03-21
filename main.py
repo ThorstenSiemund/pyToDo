@@ -76,7 +76,8 @@ def print_todos(todos):
             description = todo.description[0:MAX_DESCRIPTION_LEN - len(FILL_STRING)] + FILL_STRING
         else:
             description = todo.description
-        print('{0:<{width}s}  {1}  {2}      {3}'.format(topic,
+        print('id:{0:04d} "{1:<{width}s}"  {2}  {3}      {4}'.format(todo.id,
+                                                        topic,
                                                         todo.due_date.strftime('%d.%m.%Y'),
                                                         str(todo.done),
                                                         description,
@@ -101,6 +102,8 @@ def list_todos(session, list_option='all'):
                         open: list all open todos
                         {x}d: list all open todos for the next {x} days
                         {x}w: list all open todos for the next {x,} weeks
+                        {dd.mm.yyyy}  list all open ToDos for the specified date
+                        {dd.mm.yyyy}  list all open ToDos for the specified periode
     exceptions:
         RuntimeError: thrown if list_option is unknown
     '''
@@ -125,12 +128,10 @@ def list_todos(session, list_option='all'):
         regex = re.search(REGEX_LIST_OPTION, list_option)
         # day interval?
         if regex.group(2) == 'd':
-            # TODO: now should be 00:00
             td = (datetime.datetime.now() +
                   datetime.timedelta(days=int(regex.group(1))))
         # week interval?
         elif regex.group(2) == 'w':
-            # TODO: now should be 00:00
             td = (datetime.datetime.now() +
                   datetime.timedelta(weeks=int(regex.group(1))))
         # unknown list option
@@ -142,8 +143,6 @@ def list_todos(session, list_option='all'):
 
     # list all todos with a specific due date
     elif re.search(REGEX_DATE_SINGLE, list_option):
-        print('\n', '-' * 10, ' ToDos specific due date ', '-' * 10)
-        print(list_option)
         date1 = re.search(REGEX_DATE_SINGLE, list_option)  # get date
         dt1 = datetime.datetime.strptime(date1.group(0), '%d.%m.%Y')
         todos = session.query(ToDo).filter(ToDo.due_date == dt1)
@@ -151,7 +150,6 @@ def list_todos(session, list_option='all'):
 
     # list all todos within a specific date range
     elif re.search(REGEX_DATE_RANGE, list_option):
-        print('\n', '-' * 10, ' ToDos within a date range ', '-' * 10)
         date1 = re.search(REGEX_DATE_RANGE, list_option).group(1)    # get first date
         date2 = re.search(REGEX_DATE_RANGE, list_option).group(2)    # get second date
         dt1 = datetime.datetime.strptime(date1, '%d.%m.%Y')

@@ -2,7 +2,6 @@ import argparse
 import textwrap
 import datetime
 import re
-import sys
 import logging
 from csv import DictReader
 from distutils.util import strtobool
@@ -26,15 +25,10 @@ REGEX_DATE_SINGLE = '^' + REGEX_DATE + '$'
 # date range: dd.mm.yyyy-dd.mm.yyyy
 REGEX_DATE_RANGE = '^' + REGEX_DATE + '\-' + REGEX_DATE + '$'
 
-
-# one or two digit followed by a char ([d,w])
-REGEX_LIST_OPTION = r'\b(\d{1,2})([dw])\b'
 # validating all list options
 REGEX_VALIDATE_LIST_OPTION = r'\ball\b|\bopen\b|\bdone\b' +\
-                             '|' + REGEX_LIST_OPTION + \
                              '|' + REGEX_DATE_SINGLE +\
                              '|' + REGEX_DATE_RANGE
-# print(REGEX_VALIDATE_LIST_OPTION)
 
 
 def fill_with_test_data(session):
@@ -76,12 +70,14 @@ def print_todos(todos):
             description = todo.description[0:MAX_DESCRIPTION_LEN - len(FILL_STRING)] + FILL_STRING
         else:
             description = todo.description
-        print('id:{0:04d} "{1:<{width}s}"  {2}  {3}      {4}'.format(todo.id,
-                                                        topic,
-                                                        todo.due_date.strftime('%d.%m.%Y'),
-                                                        str(todo.done),
-                                                        description,
-                                                        width=MAX_TOPIC_LEN))
+        print('id:{0:04d} "{1:<{width1}s}" {2:>12s} {3:>7} {4:>{width2}}'.
+              format(todo.id,
+                     topic,
+                     todo.due_date.strftime('%d.%m.%Y'),
+                     str(todo.done),
+                     description,
+                     width1=MAX_TOPIC_LEN,
+                     width2=MAX_DESCRIPTION_LEN + 2))
 
 
 def add_todo(session):
@@ -92,7 +88,7 @@ def delete_todo(session):
     logging.debug('delete todo')
 
 
-def list_todos(session, list_option='all'):
+def get_todos(session, list_option='all'):
     ''' This function list todos depending on <list_option>
     parameter:
         session: DB session
@@ -100,10 +96,8 @@ def list_todos(session, list_option='all'):
                         all:  ist all todos - incl. those are done
                         done: list all done todos
                         open: list all open todos
-                        {x}d: list all open todos for the next {x} days
-                        {x}w: list all open todos for the next {x,} weeks
                         {dd.mm.yyyy}  list all open ToDos for the specified date
-                        {dd.mm.yyyy}  list all open ToDos for the specified periode
+                        {dd.mm.yyyy}-{dd.mm.yyyy}  list all open ToDos for the specified periode
     exceptions:
         RuntimeError: thrown if list_option is unknown
     '''
@@ -123,24 +117,6 @@ def list_todos(session, list_option='all'):
         todos = session.query(ToDo).filter(ToDo.done == False)      # nopep8 E712
         return(todos)
 
-    # list all todos during the interval {x} days or {x}weeks
-    elif re.search(REGEX_LIST_OPTION, list_option):
-        regex = re.search(REGEX_LIST_OPTION, list_option)
-        # day interval?
-        if regex.group(2) == 'd':
-            td = (datetime.datetime.now() +
-                  datetime.timedelta(days=int(regex.group(1))))
-        # week interval?
-        elif regex.group(2) == 'w':
-            td = (datetime.datetime.now() +
-                  datetime.timedelta(weeks=int(regex.group(1))))
-        # unknown list option
-        else:
-            raise RuntimeError('unknown list option: ', list_option)
-        # list all active todos in the given interval
-        todos = session.query(ToDo).filter(and_(ToDo.due_date <= td, ToDo.done == False))    # nopep8 E712
-        return(todos)
-
     # list all todos with a specific due date
     elif re.search(REGEX_DATE_SINGLE, list_option):
         date1 = re.search(REGEX_DATE_SINGLE, list_option)  # get date
@@ -154,6 +130,7 @@ def list_todos(session, list_option='all'):
         date2 = re.search(REGEX_DATE_RANGE, list_option).group(2)    # get second date
         dt1 = datetime.datetime.strptime(date1, '%d.%m.%Y')
         dt2 = datetime.datetime.strptime(date2, '%d.%m.%Y')
+        logging.debug(dt1 <= dt2)
         todos = session.query(ToDo).filter(and_(ToDo.due_date >= dt1, ToDo.due_date <= dt2))
         return(todos)
 
@@ -188,14 +165,6 @@ def create_session():
     return(DBSession())
 
 
-def ListOptionString(v):
-    try:
-        # return re.match(r'\ball\b|\bopen\b|\bdone\b|(\d{1,2})([dw])', v).group(0)
-        return re.match(REGEX_VALIDATE_LIST_OPTION, v).group(0)
-    except:
-        raise argparse.ArgumentTypeError("String '%s' does not match required format" % (v,))
-
-
 def main():
     parser = argparse.ArgumentParser(description='Program for administrating a ToDo list.',
                                      usage='use "python %(prog)s --help" for more information',
@@ -215,7 +184,6 @@ def main():
 
     parser.add_argument('-l', '--list',
                         action='store',
-                        type=ListOptionString,
                         dest='list_option',
                         nargs='?',
                         default=None,
@@ -225,10 +193,8 @@ def main():
                             all   list all ToDos including those which are done
                             open  list all open ToDos
                             done  list all done ToDos
-                            {x}d  list all open ToDos for the next {x} days (where {x} is 0..99 e.g. "2d", "15d", ...)
-                            {x}w  list all open ToDos for the next {x} weeks (where {x} is 0..99 e.g. "2w", "15w", ...)
                             {dd.mm.yyyy}  list all open ToDos for the specified date
-                            {dd.mm.yyyy}  list all open ToDos for the specified periode
+                            {dd.mm.yyyy}-{dd.mm.yyyy}  list all open ToDos for the specified periode
                         ''')
                         )
     results = parser.parse_args()
@@ -238,7 +204,7 @@ def main():
     fill_with_test_data(session)
 
     if results.list_option:
-        todos = list_todos(session, results.list_option)
+        todos = get_todos(session, results.list_option)
         if todos:
             print_todos(todos)
 
